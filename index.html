@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Облако тегов</title>
+  <style>
+    :root {
+      --bg: #fafafa; --fg: #1a1a1a; --muted: #888;
+      --border: #e0e0e0; --radius: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--fg);
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 3rem 1.5rem; line-height: 1.6;
+    }
+    .container { width: 100%; max-width: 560px; }
+    h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: .5rem; }
+    .subtitle { color: var(--muted); font-size: .95rem; margin-bottom: 2rem; }
+    .card {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.5rem;
+    }
+    label {
+      display: block; font-size: .85rem; font-weight: 500;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: .05em; margin-bottom: .5rem;
+    }
+    input[type="text"], textarea {
+      width: 100%; padding: .75rem 1rem; font-size: 1rem;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--bg); color: var(--fg); outline: none;
+      transition: border-color .2s; font-family: inherit;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--fg); }
+    textarea { resize: vertical; min-height: 80px; }
+    button {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .75rem 1.5rem; font-size: .95rem; font-weight: 500;
+      border: none; border-radius: var(--radius); cursor: pointer;
+      background: var(--fg); color: #fff; width: 100%; justify-content: center;
+      margin-top: 1rem; font-family: inherit;
+    }
+    button:hover { opacity: .85; }
+    .result { margin-top: 1.5rem; padding: 1.25rem; background: var(--bg); border-radius: var(--radius); display: none; }
+    .result.visible { display: block; }
+    .copy-row { display: flex; gap: .5rem; margin-top: .5rem; }
+    .copy-row input { flex: 1; }
+    .btn-copy { background: var(--bg); border: 1px solid var(--border); color: var(--fg); width: auto; }
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--fg); color: #fff; padding: .75rem 1.5rem;
+      border-radius: var(--radius); font-size: .9rem; opacity: 0;
+      transition: all .3s ease; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .question-display { font-size: 1.35rem; font-weight: 600; line-height: 1.4; margin-bottom: 1.5rem; }
+    #cloud {
+      display: flex; flex-wrap: wrap; align-items: baseline;
+      justify-content: center; gap: .6rem 1.2rem; padding: 2rem 0; min-height: 100px;
+    }
+    .tag { font-weight: 500; cursor: default; white-space: nowrap; transition: opacity .2s; }
+    .tag:hover { opacity: .6; }
+    .stats { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 1rem; }
+    .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; font-size: .95rem; }
+    .hidden { display: none !important; }
+    .link-label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 📝 Создание вопроса -->
+  <div id="view-create">
+    <h1>☁️ Облако тегов</h1>
+    <p class="subtitle">Создайте вопрос, поделитесь ссылкой — получите облако из ответов.</p>
+    <div class="card">
+      <label for="question">Ваш вопрос</label>
+      <textarea id="question" placeholder="Например: Какие три слова лучше всего описывают вашу работу?"></textarea>
+      <button onclick="createQuestion()">Создать</button>
+    </div>
+    <div class="result" id="result">
+      <div style="margin-bottom:1.25rem;">
+        <div class="link-label">📝 Ссылка для ответов</div>
+        <div class="copy-row">
+          <input type="text" id="answerLink" readonly>
+          <button class="btn-copy" onclick="copy('answerLink')">Копировать</button>
+        </div>
+      </div>
+      <div>
+        <div class="link-label">☁️ Ссылка на облако тегов</div>
+        <div class="copy-row">
+          <input type="text" id="cloudLink" readonly>
+          <button class="btn-copy" onclick="copy('cloudLink')">Копировать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✍️ Страница ответа -->
+  <div id="view-answer" class="hidden">
+    <div class="card">
+      <div class="question-display" id="qText">Загрузка…</div>
+      <label for="answerInput">Ваш ответ (одно или несколько слов)</label>
+      <input type="text" id="answerInput" placeholder="Введите слова через пробел…">
+      <button onclick="submitAnswer()">Отправить</button>
+    </div>
+    <div class="card hidden" id="thanks" style="text-align:center;">
+      <p style="font-size:1.25rem; font-weight:600; margin-bottom:.5rem;">Спасибо! ✨</p>
+      <p style="color:var(--muted); font-size:.9rem;">Ваш ответ учтён в облаке тегов.</p>
+    </div>
+  </div>
+
+  <!-- ☁️ Облако тегов -->
+  <div id="view-cloud" class="hidden">
+    <h1>☁️ Облако тегов</h1>
+    <p class="subtitle" id="cloudQText"></p>
+    <div class="card">
+      <div id="cloud"></div>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div style="text-align:center; margin-top:1rem;">
+      <button onclick="goToAnswer()" style="width:auto; display:inline-flex;">✍️ Добавить свой ответ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Скопировано!</div>
+
+<script>
+  // ── Хранилище (localStorage) ────────────────────────────
+  const DB = {
+    get() { return JSON.parse(localStorage.getItem('tagcloud_db') || '{"questions":{},"answers":{}}'); },
+    save(db) { localStorage.setItem('tagcloud_db', JSON.stringify(db)); }
+  };
+
+  function generateId() {
+    return Math.random().toString(36).substring(2, 10);
+  }
+
+  // ── Роутинг через hash ──────────────────────────────────
+  function router() {
+    const hash = location.hash.slice(1) || '/';
+    document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+
+    if (hash === '/' || hash === '') {
+      document.getElementById('view-create').classList.remove('hidden');
+    } else if (hash.startsWith('/a/')) {
+      initAnswer(hash.split('/')[2]);
+    } else if (hash.startsWith('/c/')) {
+      initCloud(hash.split('/')[2]);
+    }
+  }
+
+  window.addEventListener('hashchange', router);
+  window.addEventListener('load', router);
+
+  // ── Создание вопроса ────────────────────────────────────
+  function createQuestion() {
+    const text = document.getElementById('question').value.trim();
+    if (!text) return;
+
+    const db = DB.get();
+    const id = generateId();
+    db.questions[id] = { text, createdAt: new Date().toISOString() };
+    db.answers[id] = [];
+    DB.save(db);
+
+    // Базовый URL работает и для file://, и для http://
+    const base = window.location.href.split('#')[0];
+    document.getElementById('answerLink').value = `${base}#/a/${id}`;
+    document.getElementById('cloudLink').value  = `${base}#/c/${id}`;
+    document.getElementById('result').classList.add('visible');
+    document.getElementById('question').value = '';
+  }
+
+  // ── Страница ответа ─────────────────────────────────────
+  let currentQId = null;
+  function initAnswer(id) {
+    currentQId = id;
+    document.getElementById('view-answer').classList.remove('hidden');
+    const db = DB.get();
+    const q = db.questions[id];
+    if (!q) {
+      document.getElementById('qText').textContent = 'Вопрос не найден';
+      return;
+    }
+    document.getElementById('qText').textContent = q.text;
+    document.getElementById('answerInput').value = '';
+    document.getElementById('thanks').classList.add('hidden');
+    document.querySelector('#view-answer button').classList.remove('hidden');
+    document.getElementById('answerInput').focus();
+  }
+
+  function submitAnswer() {
+    const words = document.getElementById('answerInput').value.trim();
+    if (!words || !currentQId) return;
+
+    const db = DB.get();
+    if (!db.answers[currentQId]) db.answers[currentQId] = [];
+    db.answers[currentQId].push(words);
+    DB.save(db);
+
+    document.getElementById('thanks').classList.remove('hidden');
+    document.getElementById('answerInput').value = '';
+    document.querySelector('#view-answer button').classList.add('hidden');
+    showToast('Ответ отправлен!');
+  }
+
+  document.getElementById('answerInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitAnswer();
+  });
+
+  // ── Облако тегов ────────────────────────────────────────
+  function initCloud(id) {
+    document.getElementById('view-cloud').classList.remove('hidden');
+    const db = DB.get();
+    const q = db.questions[id];
+    if (!q) {
+      document.getElementById('cloudQText').textContent = 'Вопрос не найден';
+      document.getElementById('cloud').innerHTML = '';
+      return;
+    }
+    document.getElementById('cloudQText').textContent = q.text;
+
+    const answers = db.answers[id] || [];
+    const freq = {};
+    answers.forEach(a => {
+      a.toLowerCase().split(/\s+/)
+        .map(w => w.replace(/[.,!?;:'"()]/g, ''))
+        .filter(w => w.length > 1)
+        .forEach(w => freq[w] = (freq[w] || 0) + 1);
+    });
+
+    const tags = Object.entries(freq).map(([w, c]) => ({ word: w, count: c })).sort((a, b) => b.count - a.count);
+    const cloudEl = document.getElementById('cloud');
+    cloudEl.innerHTML = '';
+
+    if (!tags.length) {
+      cloudEl.innerHTML = '<p class="empty">Пока нет ответов. Будьте первым!</p>';
+      document.getElementById('stats').textContent = '';
+      return;
+    }
+
+    const max = Math.max(...tags.map(t => t.count));
+    const min = Math.min(...tags.map(t => t.count));
+    const range = max - min || 1;
+    const palette = ['#1a1a1a','#333','#4a4a4a','#666','#808080','#999','#2c3e50','#34495e','#5d6d7e','#7f8c8d'];
+
+    tags.forEach((tag, i) => {
+      const size = 1 + 2.2 * ((tag.count - min) / range);
+      const span = document.createElement('span');
+      span.className = 'tag';
+      span.style.fontSize = `${size}rem`;
+      span.style.color = palette[i % palette.length];
+      span.innerHTML = `${tag.word} <span style="font-size:.65em; color:#888; vertical-align:super;">${tag.count}</span>`;
+      cloudEl.appendChild(span);
+    });
+
+    const total = answers.length;
+    document.getElementById('stats').textContent =
+      `${total} ${pluralize(total, 'ответ', 'ответа', 'ответов')} · ${tags.length} ${pluralize(tags.length, 'слово', 'слова', 'слов')}`;
+  }
+
+  function goToAnswer() {
+    location.hash = `#/a/${currentQId}`;
+  }
+
+  // ── Утилиты ─────────────────────────────────────────────
+  function copy(id) {
+    const el = document.getElementById(id);
+    el.select();
+    navigator.clipboard.writeText(el.value).catch(() => {
+      el.focus(); el.setSelectionRange(0, 99999); document.execCommand('copy');
+    });
+    showToast('Скопировано!');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  function pluralize(n, one, few, many) {
+    const mod10 = n % 10, mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 14) return many;
+    if (mod10 === 1) return one;
+    if (mod10 >= 2 && mod10 <= 4) return few;
+    return many;
+  }
+</script>
+
+</body>
+</html>
